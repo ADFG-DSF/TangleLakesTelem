@@ -43,6 +43,8 @@ for(i in 1:ncol(mvt2)) {
 
 ## ------ discrete time-series plot ------------
 
+# jpeg(filename="figures/DiscreteTS_full.jpg", width=9, height=6, units="in", res=300)
+
 offset <- order(rowMeans(mvt2_numeric))/200 - .25
 par(family="serif")
 parmar <- par("mar")
@@ -62,6 +64,7 @@ axis(side=2, at=1:length(thelevels), labels=fulllevels, las=2)
 
 for(j in 1:ncol(mvt2)) text(x=rep(j,length(thelevels)), y=1:length(thelevels), labels=table(mvt2[,j]), cex=.7, font=2)
 
+# dev.off()
 
 
 ## -------- Sankey plot -----------------
@@ -80,7 +83,7 @@ mvt2_long$next_node <- factor(mvt2_long$next_node, levels=thelevels)
 # bottom <- c(-60, -60+cumsum(thetable[-length(thetable)]) + delta*(1:(length(thetable)-1)))
 # middle <- (top+bottom)/2
 
-mvt2_long %>%
+sankey_full <- mvt2_long %>%
   ggplot(aes(x = x,
              next_x = next_x,
              node = node,
@@ -101,6 +104,8 @@ mvt2_long %>%
   guides(fill = guide_legend(reverse = TRUE))+
   theme(axis.text.x=element_text(angle=90)) +
   labs(x="", fill="")
+sankey_full
+# ggsave(sankey_full, filename="figures/Sankey_full.jpg", width=9, height=6, units="in")
 
 
 ## ------------ tabular representation of the movements in Sankey plot ------
@@ -195,6 +200,8 @@ for(i in 1:ncol(mvt2)) {
 
 ## ------ discrete time-series plot ------------
 
+# jpeg(filename="figures/DiscreteTS_tangle.jpg", width=9, height=5, units="in", res=300)
+
 offset <- order(rowMeans(mvt2_numeric))/200 - .25
 par(family="serif")
 par(mar=c(5,8,4,1)+.1)
@@ -212,6 +219,8 @@ axis(side=1, at=1:ncol(mvt1), labels=datelabels, las=2)
 axis(side=2, at=1:length(thelevels), labels=fulllevels, las=2)
 
 for(j in 1:ncol(mvt2)) text(x=rep(j,length(thelevels)), y=1:length(thelevels), labels=table(mvt2[,j]), cex=.7, font=2)
+
+# dev.off()
 
 
 
@@ -310,7 +319,7 @@ mvt2_long$next_node <- factor(mvt2_long$next_node, levels=thelevels1)
 # bottom <- c(-60, -60+cumsum(thetable[-length(thetable)]) + delta*(1:(length(thetable)-1)))
 # middle <- (top+bottom)/2
 
-mvt2_long %>%
+sankey_collapse <- mvt2_long %>%
   ggplot(aes(x = x,
              next_x = next_x,
              node = node,
@@ -331,7 +340,8 @@ mvt2_long %>%
   guides(fill = guide_legend(reverse = TRUE))+
   theme(axis.text.x=element_text(angle=90)) +
   labs(x="", fill="")
-
+sankey_collapse
+ggsave(sankey_collapse, filename="figures/Sankey_collapse.jpg", width=9, height=6, units="in")
 
 
 ## ------------ tabular representation of the movements in Sankey plot ------
