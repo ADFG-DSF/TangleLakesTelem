@@ -1,0 +1,11 @@
+"","Scenario","n"
+"1","Lower Only",35
+"2","Shallow Only",2
+"3","Round Only",22
+"4","Upper Only",13
+"5","Lower and Shallow",5
+"6","Shallow and Round",22
+"7","Round and Upper",0
+"8","Lower and Round",1
+"9","Shallow and Upper",0
+"10","Lower and Upper",0

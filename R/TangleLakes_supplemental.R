@@ -228,7 +228,7 @@ for(j in 1:ncol(mvt2_collapsed)) text(x=rep(j,length(thelevels_collapsed)), y=1:
 nmoves <- apply(mvt2_numeric_collapsed, 1, function(x) sum(abs(diff(x)), na.rm=TRUE))
 par(mfrow=c(2,2))
 for(imoves in 1:max(nmoves)) {
-  
+
   # jpeg(filename="figures/DiscreteTS_tangle.jpg", width=9, height=5, units="in", res=300)
 
   offset <- order(rowMeans(mvt2_numeric_collapsed))/200 - .25
@@ -241,16 +241,16 @@ for(imoves in 1:max(nmoves)) {
        yaxs="i",
        main=paste(imoves, "moves"))
   for(i in 1:nrow(mvt2_numeric_collapsed)) {
-    lines(as.numeric(mvt2_numeric_collapsed[i,])+offset[i], 
+    lines(as.numeric(mvt2_numeric_collapsed[i,])+offset[i],
           col=adjustcolor(ifelse(nmoves[i]==imoves, 1, 4), alpha.f=
                             ifelse(nmoves[i]==imoves, .7, .2)),
           lwd=ifelse(nmoves[i]==imoves, 2, 1))
   }
   abline(h=seq(.5,9.5,by=1), lty=1)
-  
+
   axis(side=1, at=1:ncol(mvt1), labels=datelabels, las=2)
   axis(side=2, at=1:length(thelevels_collapsed), labels=fulllevels_collapsed, las=2)
-  
+
   for(j in 1:ncol(mvt2)) text(x=rep(j,length(thelevels_collapsed)), y=1:length(thelevels_collapsed), labels=table(mvt2_collapsed[,j]), cex=.7, font=2)
 
   # dev.off()
@@ -493,8 +493,30 @@ as_df <- data.frame(visitsLower, visitsShallow, visitsRound, visitsUpper)
 column_scenarios <- list(1,2,3,4,1:2,2:3,3:4,c(1,3),c(2,4),c(1,4))
 scenario_sums <- NA
 for(i in 1:length(column_scenarios)) {
-  scenario_sums[i] <- sum(as_df)   ##### incomplete!!
+  scenario_sums[i] <- sum(as_df[,column_scenarios[[i]]])   ##### incomplete!!
 }
+scenario <- c("Lower Only",
+              "Shallow Only",
+              "Round Only",
+              "Upper Only",
+              "Lower and Shallow",
+              "Shallow and Round",
+              "Round and Upper",
+              "Lower and Round",
+              "Shallow and Upper",
+              "Lower and Upper")
+scenario_sums <- c(sum(visitsLower & !visitsShallow & !visitsRound & !visitsUpper),
+                   sum(!visitsLower & visitsShallow & !visitsRound & !visitsUpper),
+                   sum(!visitsLower & !visitsShallow & visitsRound & !visitsUpper),
+                   sum(!visitsLower & !visitsShallow & !visitsRound & visitsUpper),
+                   sum(visitsLower & visitsShallow & !visitsRound & !visitsUpper),
+                   sum(!visitsLower & visitsShallow & visitsRound & !visitsUpper),
+                   sum(!visitsLower & !visitsShallow & visitsRound & visitsUpper),
+                   sum(visitsLower & !visitsShallow & visitsRound & !visitsUpper),
+                   sum(!visitsLower & visitsShallow & !visitsRound & visitsUpper),
+                   sum(visitsLower & !visitsShallow & !visitsRound & visitsUpper))
+scenario_tbl <- data.frame(Scenario=scenario, n=scenario_sums)
+# write.csv(scenario_tbl, file="tables/scenario_tbl.csv")
 
 
 # revisiting tagging data
@@ -503,28 +525,35 @@ tagdata <- read_csv("flat_data/Tangle_movement.csv")[, 1:4] %>%
 
 with(tagdata, boxplot(Length ~ Lake))
 
-tagdata %>%
+length_hist <- tagdata %>%
   ggplot(aes(x=Length)) +
   geom_histogram(breaks=seq(400,750,by=50),) +
   facet_wrap(vars(Lake), nrow=4) +
+  labs(y="Count", x="Length (mm FL)") +
   theme_bw() +
   theme(text=element_text(family="serif"))
+length_hist
+# ggsave(length_hist, file="figures/length_hist.jpg", height=6, width=6, units="in")
 
-tagdata %>%
+length_box <- tagdata %>%
   ggplot(aes(y=Length, x=Lake)) +
   geom_boxplot() +
+  labs(y="Length (mm FL)") +
   theme_bw() +
   theme(text=element_text(family="serif"))
+length_box
+# ggsave(length_box, file="figures/length_box.jpg", height=6, width=6, units="in")
+
 
 ## this didn't work like expected
 # tagdata %>%
-#   mutate(lakemoves=paste(Lake,nlakes)) -> tag2 #%>% 
+#   mutate(lakemoves=paste(Lake,nlakes)) -> tag2 #%>%
 #   ggplot(aes(y=Length, x=lakemoves)) +
 #   geom_boxplot() +
 #   theme_bw() +
 #   theme(text=element_text(family="serif"))
 
-# tagdata %>% 
+# tagdata %>%
 #   mutate(nlakes=nlakes) %>%
 #   filter(Lake %in% c("Round","Shallow")) %>%
 #   ggplot(aes(y=Length, group=nlakes, x=nlakes)) +
@@ -546,7 +575,7 @@ k <- 1
 thetables <- list()
 for(i_first in 1:(ncol(mvt2_collapsed)-1)) {
   for(i_second in (i_first+1):ncol(mvt2_collapsed)) {
-    thetables[[k]] <- table(mvt2_collapsed[mvt2_collapsed[,1] %in% c("A_RT","A_ST"), i_first], 
+    thetables[[k]] <- table(mvt2_collapsed[mvt2_collapsed[,1] %in% c("A_RT","A_ST"), i_first],
                             mvt2_collapsed[mvt2_collapsed[,1] %in% c("A_RT","A_ST"), i_second])[3:4,3:4]
     if(chisq.test(thetables[[k]], simulate.p.value=T)$p.value>.05 & i_first==1) print(thetables[[k]])
     k <- k+1
@@ -578,3 +607,5 @@ sum(nmovements[lower.tri(nmovements)])
 
 justbetween <- nmovements + t(nmovements)
 justbetween[!upper.tri(justbetween)] <- NA
+rownames(justbetween) <- colnames(justbetween) <- fulllevels1_collapsed
+write.csv(t(justbetween[5:1,5:1]), file="tables/sum_mvt_betweenlakes.csv")
