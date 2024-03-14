@@ -488,7 +488,13 @@ sum(!visitsLower & visitsShallow & visitsRound & !visitsUpper) # 22
 sum(!visitsLower & !visitsShallow & visitsRound & visitsUpper) # 0
 sum(visitsLower & !visitsShallow & visitsRound & !visitsUpper) # 1
 
-
+#### would really like to summarize this info in a single table
+as_df <- data.frame(visitsLower, visitsShallow, visitsRound, visitsUpper)
+column_scenarios <- list(1,2,3,4,1:2,2:3,3:4,c(1,3),c(2,4),c(1,4))
+scenario_sums <- NA
+for(i in 1:length(column_scenarios)) {
+  scenario_sums[i] <- sum(as_df)   ##### incomplete!!
+}
 
 
 # revisiting tagging data
@@ -542,10 +548,11 @@ for(i_first in 1:(ncol(mvt2_collapsed)-1)) {
   for(i_second in (i_first+1):ncol(mvt2_collapsed)) {
     thetables[[k]] <- table(mvt2_collapsed[mvt2_collapsed[,1] %in% c("A_RT","A_ST"), i_first], 
                             mvt2_collapsed[mvt2_collapsed[,1] %in% c("A_RT","A_ST"), i_second])[3:4,3:4]
+    if(chisq.test(thetables[[k]], simulate.p.value=T)$p.value>.05 & i_first==1) print(thetables[[k]])
     k <- k+1
   }
 }
-thechisqtests <- lapply(thetables, chisq.test)
+thechisqtests <- lapply(thetables, chisq.test, simulate.p.value=T)
 thepvals <- sapply(thechisqtests, function(x) x$p.value)
 min_exp_n <- sapply(thechisqtests, function(x) min(x$expected))
 par(mfrow=c(1,1))
@@ -568,3 +575,6 @@ rownames(nmovements) <- colnames(nmovements) <- thelevels1_collapsed
 
 sum(nmovements[upper.tri(nmovements)])
 sum(nmovements[lower.tri(nmovements)])
+
+justbetween <- nmovements + t(nmovements)
+justbetween[!upper.tri(justbetween)] <- NA
