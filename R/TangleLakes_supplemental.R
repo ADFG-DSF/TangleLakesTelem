@@ -678,7 +678,7 @@ surv_vbls_data <- list(survtable=surv,
                        # n_dist_day=length(levels(dist_day)))
 
 # JAGS controls
-niter <- 50*1000  #100
+niter <- 100*1000  #100
 ncores <- min(10, parallel::detectCores()-1)  # number of cores to use
 
 jagsouts <- list()
@@ -1073,6 +1073,18 @@ jagsouts[[7]] <- surv_vbls_jags_out
 
 
 sapply(jagsouts, function(x) x$DIC)
+# 189.6478 196.5738 194.3843 190.1954 200.4694 196.3034 194.3777
+# 189.6478* 1 time period
+# 196.5738  2 time period and LAKE (tagged)
+# 194.3843  3 time period plus LENGTH CUT
+# 190.1954* 4 time period plus LENGTH NUM
+# 200.4694  5 time period plus LAKE plus LENGTH CUT
+# 196.3034  6 time period plus LAKE plus LENGTH NUM
+# 194.3777  7 time period plus LAKE interaction with LENGTH CUT
+
+plot(sapply(jagsouts, function(x) x$DIC))
+
+
 
 lengthlab <- paste(substr(levels(lengthcut), 2, 4), "-",
                    substr(levels(lengthcut), 6, 8))
@@ -1096,7 +1108,7 @@ abline(h=0, lty=3)
 caterpillar(expit(jagsouts[[2]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[2]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
-            main="Lake Effect")
+            main="Lake Effect", log="y")
 abline(h=0:1, lty=3)
 # dev.off()
 
@@ -1109,7 +1121,7 @@ abline(h=0, lty=3)
 caterpillar(expit(jagsouts[[3]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[3]]$sims.list$b_lengthcut), xax=lengthlab, ylab="Mult. Adjustment on Surv Odds",
-            main="Length Effect (Categorical)")
+            main="Length Effect (Categorical)", log="y")
 abline(h=0:1, lty=3)
 # dev.off()
 
@@ -1142,10 +1154,10 @@ abline(h=0, lty=3)
 caterpillar(expit(jagsouts[[5]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[5]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
-            main="Lake Effect")#,log="y"
+            main="Lake Effect", log="y")#,log="y"
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[5]]$sims.list$b_lengthcut), xax=lengthlab, ylab="Mult. Adjustment on Surv Odds",
-            main="Length Effect (Categorical)")#,log="y"
+            main="Length Effect (Categorical)", log="y")#,log="y"
 abline(h=0:1, lty=2)
 # dev.off()
 
@@ -1160,7 +1172,7 @@ abline(h=0, lty=3)
 caterpillar(expit(jagsouts[[6]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[6]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
-            main="Lake Effect")
+            main="Lake Effect", log="y")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[6]]$sims.list$b_length), 
             main="Length Effect (Numeric)")
@@ -1177,7 +1189,588 @@ abline(h=0, lty=3)
 caterpillar(expit(jagsouts[[7]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
 abline(h=0:1, lty=3)
 caterpillar(exp(jagsouts[[7]]$sims.list$b_lakelength), ylab="Mult. Adjustment on Surv Odds",
-            main="Lake & Length Effect - interaction",
+            main="Lake & Length Effect - interaction", log="y",
+            col=rep(2:5,each=3), xlab=paste(levels(lake_id), collapse="              "))
+abline(h=1, lty=3)
+# dev.off()
+
+
+
+
+## ------ repeating this analysis, but for fishing mortality rather than natural
+
+surv <- matrix(1, nrow=nrow(mvt1), ncol=ncol(mvt1))
+
+# surv[mvt1 == "AL" | mvt1 == "FM"] <- NA
+# surv[mvt1 == "NFM"] <- 0
+
+# surv[mvt1 == "AL"] <- NA  
+# surv[mvt1 == "NFM" | mvt1 == "FM"] <- 0
+
+# ##### come back to this, it's really interesting
+surv[mvt1 == "AL" | mvt1 == "NFM"] <- NA
+surv[mvt1 == "FM"] <- 0
+
+# surv[mvt1 %in% c("A_GL", "A_UT", "A_RT", "A_ST", "A_LT")] <- 1
+
+# table(mvt1[surv==0 & !is.na(surv)])
+# table(mvt1[surv==1 & !is.na(surv)])
+# table(mvt1[is.na(surv)])
+
+# now imputing ones or zeroes when it can be logically determined
+for(i in 1:nrow(surv)) {
+  which1 <- which(surv[i,]==1)
+  which0 <- which(surv[i,]==0)
+  if(length(which1) > 0) surv[i, 1:max(which1)] <- 1
+  if(length(which0) > 0) surv[i, min(which0):ncol(surv)] <- 0
+}
+
+# defining a data input expressing the first survey an individual is observed to be dead
+firstdead <- rep(NA, nrow(surv))
+for(i in 1:nrow(surv)) {
+  firstdead[i] <- ifelse(!any(surv[i,]==0, na.rm=T),
+                         ncol(surv),
+                         which.max(surv[i,]==0))
+}
+firstpresent <- rep(1,length(firstdead))
+
+# # make appropriate cut variables: lengthcut, dist_obs, dist_day, homerange
+length_id <- tagdata$Length
+lake_id <- tagdata$Lake
+lengthcut <- cut(length_id, breaks=c(400,500,600,750))
+# dist_obs <- cut(dtab$dist_per_obs, breaks=c(0,25,50,100,200))
+# dist_day <- cut(dtab$dist_per_day, breaks=c(0,.2,.4,.6,1))
+# sectionmode <- loc3_id
+
+
+surv_vbls_data <- list(survtable=surv,
+                       firstdead=firstdead,
+                       firstpresent=firstpresent,
+                       n=nrow(surv),
+                       np=ncol(surv)-1,
+                       lake=as.numeric(as.factor(lake_id)),
+                       n_lake=length(unique(lake_id)),
+                       lengthcut=as.numeric(as.factor(lengthcut)),
+                       n_length=length(levels(lengthcut)),#,
+                       length=length_id - mean(length_id, na.rm=T))#,
+# dist_obs=as.numeric(as.factor(dist_obs)),
+# n_dist_obs=length(levels(dist_obs)),
+# dist_day=as.numeric(as.factor(dist_day)),
+# n_dist_day=length(levels(dist_day)))
+
+# JAGS controls
+niter <- 100*1000  #100
+ncores <- min(10, parallel::detectCores()-1)  # number of cores to use
+
+jagsouts <- list()
+
+## Model 1: base model (just time period)
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      # + b_lake[lake[i]]
+      # + b_lengthcut[lengthcut[i]]
+      # + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  # for(i_lake in 1:(n_lake-1)) {
+  #   b_lake[i_lake] ~ dnorm(0, 0.1)
+  # }
+  # b_section[n_section] <- -sum(b_section[1:(n_section-1)])
+
+  # for(i_length in 1:(n_length-1)) {
+  #   b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  # }
+  # b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  # b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[1]] <- surv_vbls_jags_out
+
+## Model 2: time period and LAKE (tagged)
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      + b_lake[lake[i]]
+      # + b_lengthcut[lengthcut[i]]
+      # + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  for(i_lake in 1:(n_lake-1)) {
+    b_lake[i_lake] ~ dnorm(0, 0.1)
+  }
+  b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  # for(i_length in 1:(n_length-1)) {
+  #   b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  # }
+  # b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  # b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[2]] <- surv_vbls_jags_out
+
+## Model 3: time period plus LENGTH CUT
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      # + b_lake[lake[i]]
+      + b_lengthcut[lengthcut[i]]
+      # + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  # for(i_lake in 1:(n_lake-1)) {
+  #   b_lake[i_lake] ~ dnorm(0, 0.1)
+  # }
+  # b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  for(i_length in 1:(n_length-1)) {
+    b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  }
+  b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  # b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[3]] <- surv_vbls_jags_out
+
+## Model 4: time period plus LENGTH NUM
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      # + b_lake[lake[i]]
+      # + b_lengthcut[lengthcut[i]]
+      + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  # for(i_lake in 1:(n_lake-1)) {
+  #   b_lake[i_lake] ~ dnorm(0, 0.1)
+  # }
+  # b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  # for(i_length in 1:(n_length-1)) {
+  #   b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  # }
+  # b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[4]] <- surv_vbls_jags_out
+
+## Model 5: time period plus LAKE plus LENGTH CUT
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      + b_lake[lake[i]]
+      + b_lengthcut[lengthcut[i]]
+      # + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  for(i_lake in 1:(n_lake-1)) {
+    b_lake[i_lake] ~ dnorm(0, 0.1)
+  }
+  b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  for(i_length in 1:(n_length-1)) {
+    b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  }
+  b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  # b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[5]] <- surv_vbls_jags_out
+
+## Model 6: time period plus LAKE plus LENGTH NUM
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      + b_lake[lake[i]]
+      # + b_lengthcut[lengthcut[i]]
+      + b_length*length[i]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  for(i_lake in 1:(n_lake-1)) {
+    b_lake[i_lake] ~ dnorm(0, 0.1)
+  }
+  b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  # for(i_length in 1:(n_length-1)) {
+  #   b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  # }
+  # b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  b_length ~ dnorm(0, 0.1)
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[6]] <- surv_vbls_jags_out
+
+## Model 7: time period plus LAKE interaction with LENGTH CUT
+lakelength <- paste(lake_id, lengthcut)
+thegrid <- expand.grid(levels(lengthcut), levels(lake_id))
+lakelength <- factor(paste(lake_id, lengthcut),
+                     levels=paste(thegrid[,2], thegrid[,1]))
+table(lakelength)
+surv_vbls_data$lakelength <- as.numeric(lakelength)
+surv_vbls_data$n_lakelength <- surv_vbls_data$n_lake * surv_vbls_data$n_length
+
+surv_vbls_jags <- tempfile()
+cat('model {
+  for(i in 1:n) {
+    for(j in 2:firstdead[i]) {          # for each survey
+      # survtable[i,j] ~ dbin(p[j-1], survtable[i,j-1])   # for each event present
+      survtable[i,j] ~ dbin(p[i,j], survtable[i,j-1])
+      logit(p[i,j]) <- b0[j-1]
+      # + b_lake[lake[i]]
+      # + b_lengthcut[lengthcut[i]]
+      # + b_length*length[i]
+      + b_lakelength[lakelength[i]]
+
+      # survtable_pp[i,j] ~ dbin(p[i,j], survtable[i,j-1])   ### this is included for pp check
+
+    }
+  }
+
+  for(j in 1:np) {
+    b0[j] ~ dnorm(0, 0.1) # <- b0all #
+  }
+  # b0all ~ dnorm(0, 0.1)
+
+  # for(i_lake in 1:(n_lake-1)) {
+  #   b_lake[i_lake] ~ dnorm(0, 0.1)
+  # }
+  # b_lake[n_lake] <- -sum(b_lake[1:(n_lake-1)])
+
+  # for(i_length in 1:(n_length-1)) {
+  #   b_lengthcut[i_length] ~ dnorm(0, 0.1)
+  # }
+  # b_lengthcut[n_length] <- -sum(b_lengthcut[2:(n_length-1)])
+
+  # b_length ~ dnorm(0, 0.1)
+
+  for(i_length in 1:(n_lakelength-1)) {
+    b_lakelength[i_length] ~ dnorm(0, 1)  # .1
+  }
+  b_lakelength[n_lakelength] <- -sum(b_lakelength[2:(n_lakelength-1)])
+
+}', file=surv_vbls_jags)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  surv_vbls_jags_out <- jagsUI::jags(model.file=surv_vbls_jags, data=surv_vbls_data,
+                                     parameters.to.save=c("p","b0","b_lake","b_length","b_lengthcut",
+                                                          "survtable_pp",
+                                                          "b0all",
+                                                          "b_lakelength"), #"survtable",
+                                     n.chains=ncores, parallel=T, n.iter=niter,
+                                     n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+  
+  par(mfrow=c(3,3))
+  plotRhats(surv_vbls_jags_out)
+  traceworstRhat(surv_vbls_jags_out)
+}
+jagsouts[[7]] <- surv_vbls_jags_out
+
+
+
+
+sapply(jagsouts, function(x) x$DIC)
+# 105.15708 100.20091 103.14717 103.21280  94.39751  97.76705  97.69235
+# 105.15708  1 time period
+# 100.20091  2 time period and LAKE (tagged)
+# 103.14717  3 time period plus LENGTH CUT
+# 103.21280  4 time period plus LENGTH NUM
+# 94.39751** 5 time period plus LAKE plus LENGTH CUT
+# 97.76705*  6 time period plus LAKE plus LENGTH NUM
+# 97.69235*  7 time period plus LAKE interaction with LENGTH CUT
+
+plot(sapply(jagsouts, function(x) x$DIC))
+
+
+
+lengthlab <- paste(substr(levels(lengthcut), 2, 4), "-",
+                   substr(levels(lengthcut), 6, 8))
+par(mar=parmar)
+
+# jpeg(filename="figures/survmodel1_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,2))
+caterpillar(jagsouts[[1]], p="b0")
+plot(NA)
+caterpillar(expit(jagsouts[[1]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+# dev.off()
+
+# jpeg(filename="figures/survmodel2_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,2))
+caterpillar(jagsouts[[2]], p="b0")
+caterpillar(jagsouts[[2]], p="b_lake", xax=levels(lake_id))
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[2]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[2]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
+            main="Lake Effect", log="y")
+abline(h=0:1, lty=3)
+# dev.off()
+
+# jpeg(filename="figures/survmodel3_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,2))
+caterpillar(jagsouts[[3]], p="b0")
+caterpillar(jagsouts[[3]], p="b_lengthcut", xax=lengthlab)
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[3]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[3]]$sims.list$b_lengthcut), xax=lengthlab, ylab="Mult. Adjustment on Surv Odds",
+            main="Length Effect (Categorical)", log="y")
+abline(h=0:1, lty=3)
+# dev.off()
+
+# jpeg(filename="figures/survmodel4_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,2))
+caterpillar(jagsouts[[4]], p="b0")
+caterpillar(jagsouts[[4]], p="b_length")
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[4]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[4]]$sims.list$b_length), 
+            main="Length Effect (Numeric)")
+abline(h=0:1, lty=3)
+# dev.off()
+
+# plotdens(jagsouts[[4]], p="b_length")
+# abline(v=0, lty=2)
+# plotdens(exp(jagsouts[[4]]$sims.list$b_length))
+# abline(v=1, lty=2)
+
+# jpeg(filename="figures/survmodel5_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,3))
+caterpillar(jagsouts[[5]], p="b0")
+caterpillar(jagsouts[[5]], p="b_lake", xax=levels(lake_id))
+abline(h=0, lty=3)
+caterpillar(jagsouts[[5]], p="b_lengthcut", xax=lengthlab)
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[5]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[5]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
+            main="Lake Effect", log="y")#,log="y"
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[5]]$sims.list$b_lengthcut), xax=lengthlab, ylab="Mult. Adjustment on Surv Odds",
+            main="Length Effect (Categorical)", log="y")#,log="y"
+abline(h=0:1, lty=2)
+# dev.off()
+
+# jpeg(filename="figures/survmodel6_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,3))
+caterpillar(jagsouts[[6]], p="b0")
+caterpillar(jagsouts[[6]], p="b_lake", xax=levels(lake_id))
+abline(h=0, lty=3)
+caterpillar(jagsouts[[6]], p="b_length")
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[6]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[6]]$sims.list$b_lake), xax=levels(lake_id), ylab="Mult. Adjustment on Surv Odds",
+            main="Lake Effect", log="y")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[6]]$sims.list$b_length), 
+            main="Length Effect (Numeric)")
+abline(h=0:1, lty=3)
+# dev.off()
+
+# jpeg(filename="figures/survmodel7_fishingmort.jpg", width=9, height=9, units="in", res=300)
+# par(family="serif")
+par(mfrow=c(2,2))
+caterpillar(jagsouts[[7]], p="b0")
+caterpillar(jagsouts[[7]], p="b_lakelength",
+            col=rep(2:5,each=3), xlab=paste(levels(lake_id), collapse="              "))
+abline(h=0, lty=3)
+caterpillar(expit(jagsouts[[7]]$sims.list$b0), main="Baseline Survival Probability", xlab="Survey")
+abline(h=0:1, lty=3)
+caterpillar(exp(jagsouts[[7]]$sims.list$b_lakelength), ylab="Mult. Adjustment on Surv Odds",
+            main="Lake & Length Effect - interaction", log="y",
             col=rep(2:5,each=3), xlab=paste(levels(lake_id), collapse="              "))
 abline(h=1, lty=3)
 # dev.off()
