@@ -1,4 +1,57 @@
-### NEED HEADER HERE
+### Tangle Lakes Telemetry
+### supplemental analyses & summaries
+
+### Matt Tyers March 2024
+
+
+# Since most of the analysis was performed already, the focus of this script is 
+# primarily visualizing movement.  Movement was discrete in nature, and occurred
+# between the set of four Tangle Lakes (Lower, Shallow, Round, and Upper), as well
+# as Glacier Lake and mortality (fishing and non-fishing).
+
+# To that end, two types of plots are produced:
+# - Sankey plots (movement is visualized as flow)
+# - Discrete time-series plots (movement is visualized as points/lines)
+# In both cases, plots are produced for all possible states, as well as collapsing
+# At Large, Fishing Mortality, Non-fishing Mortality, and Glacier Lake to a single
+# category "Out".
+
+
+# The next section of code primarily deals with tabulating the number of movements
+# that occurred between lakes.  Since a relatively large degree of movement was 
+# observed between Round and Shallow tangles, a sequence of chi^2 tests were
+# conducted in order to see if complete mixing was ever observed between these
+# two lakes (it wasn't.)
+
+
+# Finally, a Bayesian survival model (developed for a different telemetry study)
+# was applied to the survival matrix from this study.  The intent was to test
+# whether individual-level variables had any overall effect on survival over the 
+# course of a project, after accounting for differences in survival rates between 
+# sequential surveys.  Since not every fish was observed in every survey, it was 
+# difficult to construct any meaningful summaries of survival proportions that 
+# didn’t omit information.
+
+# To that end, a matrix was defined such that
+# -	Each row represented a fish
+# -	Each column represented a survey
+# -	Each cell was defined as 1=alive, 0=dead, NA=at large/unobserved.
+
+# Each fish surviving from one survey to the next was modeled as a function of a 
+# baseline survival probability for each time period (common to all fish), plus 
+# the effects of lake, size, etc.  The model formulation allowed for treating NA’s 
+# as additional free parameters in the model, which allowed for using the remainder 
+# of that fish’s history.
+
+# Since natural mortality and fishing mortality were very different processes, 
+# a set of candidate models were run both ways.  For natural mortality, none of 
+# the candidate models did any better than the base model (just considering time 
+# period).  However, for fishing mortality, some pretty big effects show up 
+# even though there’s not much data.  
+
+
+
+
 
 ## loading some packages
 library(tidyverse)
