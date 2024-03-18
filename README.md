@@ -37,3 +37,9 @@ All figures created by the .R file.
 - *survmodelXX_fishingmort.jpg* give output plots from the set of models for FISHING mortality.
 
 ### /tables
+
+Tables created by the .R file.  These are created as individual .csv files without any formatting.
+
+- *tableto_XXX.csv* and *tablefrom_XXX.csv* give the counts and proportions of tagged fish migrating TO and FROM each lake/state, relative to each lake/state.  Effectively, these are tabular representations of the flows depicted in the Sankey plots.
+- *sum_mvt_betweenlakes.csv* tabulates the numbers of times fish moved between each pair of lakes.  It should be noted that the data source for this was the locations as determined by flights & boat surveys, rather than the fixed stations.
+- *scenario_tbl.csv* tabulates the number of fish that stay located in each lake or each pair of lakes.
